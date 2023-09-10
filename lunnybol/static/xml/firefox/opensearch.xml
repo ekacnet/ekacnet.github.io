@@ -1,0 +1,7 @@
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+<ShortName>LunnyBOL</ShortName>
+<Description>LunnyBOL the search</Description>
+<Image height="16" width="16" type="image/x-icon">http://localhost:3000/static/images/favicon.ico</Image>
+<InputEncoding>UTF-8</InputEncoding>
+<Url type="text/html" method="get" template="http://localhost:3000/?search={searchTerms}"/>
+</OpenSearchDescription>
