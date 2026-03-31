@@ -6,7 +6,11 @@
         font-family: "Helvetica Neue", Helvetica, sans-serif;
         margin: 30px auto;
         width: 1280px;
+    }
+
+    #demo {
         position: relative;
+        overflow: hidden;
     }
 
     header {
@@ -43,7 +47,6 @@
         background-image: -moz-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
         background-image: -webkit-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
         background-image: -ms-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
-        top: 0px;
         padding: 0 0 24px 0;
     }
 
@@ -53,7 +56,6 @@
         background-image: -moz-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
         background-image: -webkit-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
         background-image: -ms-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
-        bottom: 0px;
         padding: 24px 0 0 0;
     }
 
@@ -95,42 +97,57 @@
     }
 
     .line {
+        position: relative;
         background: #000;
         z-index: 2;
     }
 
+    .rule {
+    }
+
 </style>
 <script src="lib/d3.v7.min.js" charset="utf-8"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-shim/0.35.3/es6-shim.js"></script>
-<script src="./cubism-es.standalone.js"></script>
-<body id="demo">
+<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-shim/0.35.3/es6-shim.js"></script>-->
+<script src="./cubism-ng.standalone.js"></script>
+<body>
+<H1> Stock Demo</H1>
+<div id="demo">
 <script>
 
     var delay = Date.now()  - new Date(2012, 4, 2)
+    var size = 1280;
     var context = cubism.context()
         .serverDelay(delay)
-        .step(864e5)
-        .size(1280)
+        .step(864e5) // 86400 000 aka 86400 seconds
+        .size(size)
         .stop();
 
-    d3.select("#demo").selectAll(".axis")
-        .data(['top', "bottom"])
-        .enter().append("div")
-        .attr("class", function(d) { return d + " axis"; })
-        .each(function(d) { context.axis().ticks(12).orient(d).render(d3.select(this)) });
 
-    const d = d3.select("body").append("div")
-        .attr("class", "rule")
-        .attr('id', 'rule');
-    context.rule().render(d);
 
-    d3.select("body").selectAll(".horizon")
+    d3.select("#demo").selectAll(".horizon")
         .data(["AAPL", "BIDU", "SINA", "GOOG", "MSFT", "YHOO", "ADBE", "REDF", "INSP", "IACI", "AVID", "CCUR", "DELL", "DGII", "HPQ", "SGI", "SMCI", "SNDK", "SYNA"].map(stock))
         .enter().insert("div", ".bottom")
         .attr("class", "horizon");
 
 
     context.horizon().format(d3.format("+,.2p")).render(d3.selectAll('.horizon'))
+    const z = d3.select("#demo").append("div")
+        .attr("class", "zoom");
+    const d = d3.select("#demo").append("div")
+        .attr("class", "rule")
+        .attr('id', 'rule');
+    context.rule().render(d);
+    d3.select("#demo").selectAll(".axis")
+        .data(['top', "bottom"])
+        .enter().append("div")
+        .attr("class", function(d) { return d + " axis"; })
+        .each(function(d) { context.axis().ticks(12).orient(d).render(d3.select(this)) });
+
+    context.zoom(function(start, end, selection) {
+        console.log(`Doing a zoom from point ${start} to point ${end}`);
+        context.zoom().zoomTime(start, end, selection);
+    }).render(z);
+
 
     context.on("focus", function(i) {
         d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
@@ -141,16 +158,30 @@
         var format = d3.timeParse("%d-%b-%y");
         return context.metric(function(start, stop, step, callback) {
             d3.csv("data/stocks/" + name + ".csv").then(rows => {
+                // read all the rows date the date and the open value, filter only for lines where
+                // there is data
                 rows = rows.map(function(d) { return [format(d.Date), +d.Open]; }).filter(function(d) { return d[1]; }).reverse();
-                var date = rows[0][0], compare = rows[400][1], value = rows[0][1], values = [value];
+                var date = rows[0][0], compare = rows[400][1], value = 0, values = [];
                 rows.forEach(function(d) {
-                    while ((date = d3.timeDay.offset(date, 1)) < d[0]) values.push(value);
-                    values.push(value = (d[1] - compare) / compare);
+                    if (d[0] >= start  && d[0] <= stop) {
+                        if (date < start) {
+                            console.log(`Forcing ${date} to ${start} end = ${stop} d[0] = ${d[0]} ${step/1000}`);
+                            date = start
+                        }
+                        while ((date = d3.timeMillisecond.offset(date, step )) < d[0]) { values.push(value);}
+                        values.push(value = (d[1] - compare) / compare);
+                    } else {
+                       date = d[0]
+                    }
                 });
-                callback(null, values.slice(-context.size()));
+                const desired_length = (stop -start)/step;
+                while (values.length < desired_length) values.push(value);
+                callback(null, values);
             });
         }, name);
     }
 
 </script>
-
+</div>
+</body>
+</html>
